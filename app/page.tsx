@@ -134,9 +134,7 @@ export default function Home() {
 
       {data.length > 0 && (
         <>
-          <ProduccionChart
-            data={data}
-          />
+         {/* <ProduccionChart data={data} /> */}
 
           <div className="rounded-xl border bg-white p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold">
