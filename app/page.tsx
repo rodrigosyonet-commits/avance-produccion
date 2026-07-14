@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -78,5 +77,8 @@ export default function Home() {
 
     </main>
   );
+import DataTable from "@/components/DataTable";
+
+<DataTable data={resultados} />
 
 }
