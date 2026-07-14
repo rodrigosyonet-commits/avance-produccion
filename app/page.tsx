@@ -5,8 +5,6 @@ import { useState } from "react";
 import EmpresaSelector from "@/components/EmpresaSelector";
 import MesSelector from "@/components/MesSelector";
 import DataTable from "@/components/DataTable";
-import ProduccionChart from "@/components/ProduccionChart";
-
 export default function Home() {
   const [usuario, setUsuario] = useState(
     "sistemas1.qsitservices@gmail.com"
@@ -134,8 +132,6 @@ export default function Home() {
 
       {data.length > 0 && (
         <>
-         /* <ProduccionChart data={data} /> */
-
           <div className="rounded-xl border bg-white p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold">
               Detalle de Producción
