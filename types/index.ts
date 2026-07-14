@@ -1,4 +1,3 @@
-
 export type Empresa = {
   nombre: string;
   rfc: string;
