@@ -29,10 +29,7 @@ export async function consultarSiNube(
   form.append("emp", empresa);
   form.append("suc", sucursal);
   form.append("usu", usuario);
-  form.append(
-    "pas",
-    password
-  );
+  form.append("pas", password);
   form.append("cns", consulta);
 
   const response =
