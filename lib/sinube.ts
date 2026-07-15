@@ -4,7 +4,9 @@ export async function consultarSiNube(
   sucursal: string,
   consulta: string
 ) {
-  const url = process.env.SINUBE_URL;
+  const url =
+    process.env.SINUBE_URL;
+
   const password =
     process.env.SINUBE_PASSWORD;
 
@@ -20,66 +22,74 @@ export async function consultarSiNube(
     );
   }
 
-  const form = new URLSearchParams();
+  const form =
+    new URLSearchParams();
 
   form.append("tipo", "3");
   form.append("emp", empresa);
-  form.append("suc", sucursal);
-  form.append("usu", usuario);
-  form.append("pas", password);
-  form.append("cns", consulta);
+  form.append(
+    "suc",
+    sucursal
+  );
+  form.append(
+    "usu",
+    usuario
+  );
+  form.append(
+    "pas",
+    password
+  );
+  form.append(
+    "cns",
+    consulta
+  );
 
-  const response = await fetch(url, {
-    method: "POST",
-    body: form,
-    cache: "no-store",
-    headers: {
-      "Content-Type":
-        "application/x-www-form-urlencoded",
-    },
+  console.log(
+    "=========="
+  );
+  console.log(
+    "REQUEST SINUBE"
+  );
+  console.log(
+    "=========="
+  );
+
+  console.log({
+    url,
+    usuario,
+    empresa,
+    sucursal,
   });
+
+  const response =
+    await fetch(url, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+      },
+      body: form,
+    });
 
   const texto =
     await response.text();
 
   console.log(
-    "STATUS SINUBE:",
+    "STATUS:",
     response.status
   );
 
   console.log(
-    "URL SINUBE:",
-    url
+    "RESPUESTA:"
   );
 
   console.log(
-    "RESPUESTA SINUBE:"
+    texto.substring(
+      0,
+      3000
+    )
   );
-
-  console.log(texto);
-
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status}: ${texto}`
-    );
-  }
-
-  if (
-    texto.startsWith(
-      "<!DOCTYPE"
-    ) ||
-    texto.startsWith("<html")
-  ) {
-    throw new Error(
-      "SiNube devolvió HTML en lugar de datos. Verifica URL, usuario o password."
-    );
-  }
-
-  if (
-    texto.startsWith("Error:")
-  ) {
-    throw new Error(texto);
-  }
 
   return texto;
 }
