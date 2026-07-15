@@ -8,13 +8,27 @@ import KpiCards from "@/components/KpiCards";
 import ProduccionChart from "@/components/ProduccionChart";
 import DataTable from "@/components/DataTable";
 
+interface ApiResponse {
+  success?: boolean;
+  data?: any[];
+  debug?: any;
+  error?: string;
+}
+
 export default function Page() {
   const [usuario, setUsuario] = useState(
     "sistemas1.qsitservices@gmail.com"
   );
 
   const [empresa, setEmpresa] = useState("jugos");
-  const [mes, setMes] = useState("202607");
+
+  const [mes, setMes] = useState(
+    new Date().getFullYear().toString() +
+      String(new Date().getMonth() + 1).padStart(
+        2,
+        "0"
+      )
+  );
 
   const [loading, setLoading] = useState(false);
 
@@ -24,32 +38,22 @@ export default function Page() {
 
   const [debug, setDebug] = useState<any>(null);
 
-  async function consultar() {
-    setLoading(true);
-    setError("");
-    setData([]);
-
+  const consultar = async () => {
     const payload = {
       usuario,
       empresaId: empresa,
       mes,
     };
 
+    setLoading(true);
+    setError("");
+    setData([]);
+
     try {
-      console.clear();
-
-      console.log(
-        "===================================="
-      );
-      console.log("CONSULTA INICIADA");
-      console.log(
-        "===================================="
-      );
-      console.log(payload);
-
       setDebug({
-        estado: "ANTES_FETCH",
-        enviando: payload,
+        estado: "INICIO_CONSULTA",
+        fecha: new Date().toISOString(),
+        payload,
       });
 
       const response = await fetch(
@@ -66,96 +70,78 @@ export default function Page() {
         }
       );
 
-      const rawText =
+      const responseText =
         await response.text();
 
-      console.log(
-        "STATUS API:"
-      );
-      console.log(response.status);
-
-      console.log(
-        "RAW RESPONSE:"
-      );
-      console.log(rawText);
-
-      let json: any = null;
+      let result: ApiResponse;
 
       try {
-        json =
-          JSON.parse(rawText);
-
-        console.log(
-          "JSON PARSEADO OK"
-        );
-
-        console.log(json);
-      } catch (parseError) {
-        console.error(
-          "NO SE PUDO PARSEAR JSON"
-        );
-
-        console.error(parseError);
-
+        result =
+          JSON.parse(responseText);
+      } catch {
         setDebug({
           estado:
-            "ERROR_PARSEANDO_JSON",
-          enviando: payload,
-          status:
+            "ERROR_JSON_INVALIDO",
+          payload,
+          responseStatus:
             response.status,
-          respuestaRaw:
-            rawText,
-          headers:
-            Object.fromEntries(
-              response.headers.entries()
+          responseOk:
+            response.ok,
+          responseText:
+            responseText.substring(
+              0,
+              5000
             ),
         });
 
         throw new Error(
-          "La API devolvió HTML o texto plano y no JSON."
+          "La API devolvió HTML o texto plano en lugar de JSON."
         );
       }
 
-      setDebug(
-        json.debug ?? json
-      );
+      setDebug({
+        responseStatus:
+          response.status,
+        responseOk:
+          response.ok,
+        ...(result.debug ??
+          result),
+      });
 
       if (!response.ok) {
         throw new Error(
-          json.error ||
-            json.debug?.error ||
-            "Error en API"
+          result.error ||
+            result.debug?.error ||
+            "Error al consultar API"
         );
       }
 
-      if (json.data) {
-        setData(json.data);
-      } else {
-        setData([]);
-      }
-    } catch (err: any) {
-      console.error(
-        "ERROR FRONTEND"
+      setData(
+        Array.isArray(
+          result.data
+        )
+          ? result.data
+          : []
       );
+    } catch (err) {
+      const mensaje =
+        err instanceof Error
+          ? err.message
+          : "Error desconocido";
 
-      console.error(err);
-
-      setError(
-        err.message ||
-          "Error desconocido"
-      );
+      setError(mensaje);
 
       setDebug((prev: any) => ({
-        ...(prev || {}),
+        ...(prev ?? {}),
         errorFrontend:
-          err.message,
-        stack:
-          err.stack,
+          mensaje,
       }));
+
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   const kpis = useMemo(() => {
     const totalOrdenes =
@@ -163,13 +149,10 @@ export default function Page() {
 
     const totalPlaneado =
       data.reduce(
-        (
-          sum,
-          item
-        ) =>
+        (sum, row) =>
           sum +
           Number(
-            item.cantidadProducir ||
+            row.cantidadProducir ||
               0
           ),
         0
@@ -177,13 +160,10 @@ export default function Page() {
 
     const totalProducido =
       data.reduce(
-        (
-          sum,
-          item
-        ) =>
+        (sum, row) =>
           sum +
           Number(
-            item.cantidadProducida ||
+            row.cantidadProducida ||
               0
           ),
         0
@@ -192,13 +172,10 @@ export default function Page() {
     const avancePromedio =
       totalOrdenes > 0
         ? data.reduce(
-            (
-              sum,
-              item
-            ) =>
+            (sum, row) =>
               sum +
               Number(
-                item.avance || 0
+                row.avance || 0
               ),
             0
           ) / totalOrdenes
@@ -206,15 +183,15 @@ export default function Page() {
 
     const terminadas =
       data.filter(
-        (x) =>
-          x.estado ===
+        (row) =>
+          row.estado ===
           "🟢 Completa"
       ).length;
 
     const enProceso =
       data.filter(
-        (x) =>
-          x.estado ===
+        (row) =>
+          row.estado ===
           "🟡 Parcial"
       ).length;
 
@@ -237,29 +214,28 @@ export default function Page() {
           </h1>
 
           <p className="mt-2 text-slate-600">
-            Dashboard de
-            Producción SiNube
+            Consulta manual
+            de producción
+            desde SiNube
           </p>
         </div>
 
         <div className="mb-6 rounded-xl bg-white p-6 shadow">
           <div className="grid gap-4 md:grid-cols-4">
             <div>
-              <label className="mb-2 block font-medium">
+              <label className="mb-2 block text-sm font-medium">
                 Usuario
               </label>
 
               <input
                 type="email"
-                value={
-                  usuario
-                }
+                value={usuario}
                 onChange={(e) =>
                   setUsuario(
                     e.target.value
                   )
                 }
-                className="w-full rounded-lg border p-3"
+                className="w-full rounded-lg border border-slate-300 p-3"
               />
             </div>
 
@@ -283,7 +259,7 @@ export default function Page() {
                 disabled={
                   loading
                 }
-                className="w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading
                   ? "Consultando..."
@@ -294,12 +270,14 @@ export default function Page() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
-            <div className="font-bold">
+          <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4">
+            <div className="font-bold text-red-700">
               Error
             </div>
 
-            <div>{error}</div>
+            <div className="mt-2 text-red-600">
+              {error}
+            </div>
           </div>
         )}
 
@@ -326,31 +304,26 @@ export default function Page() {
           />
         </div>
 
-        {data.length >
-          0 && (
+        {data.length > 0 && (
           <>
             <div className="mb-6 rounded-xl bg-white p-4 shadow">
               <h2 className="mb-4 text-xl font-semibold">
-                Gráfico de
                 Producción
               </h2>
 
               <ProduccionChart
-                data={
-                  data
-                }
+                data={data}
               />
             </div>
 
             <div className="mb-6 rounded-xl bg-white p-4 shadow">
               <h2 className="mb-4 text-xl font-semibold">
-                Detalle
+                Detalle de
+                Producción
               </h2>
 
               <DataTable
-                data={
-                  data
-                }
+                data={data}
               />
             </div>
           </>
@@ -372,13 +345,13 @@ export default function Page() {
                   )
                 )
               }
-              className="rounded bg-slate-700 px-3 py-1 text-sm"
+              className="rounded bg-slate-700 px-3 py-1 text-xs"
             >
               Copiar Debug
             </button>
           </div>
 
-          <pre className="max-h-[700px] overflow-auto text-xs">
+          <pre className="max-h-[700px] overflow-auto whitespace-pre-wrap text-xs">
             {JSON.stringify(
               debug,
               null,
