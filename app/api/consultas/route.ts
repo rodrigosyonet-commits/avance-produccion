@@ -18,31 +18,20 @@ export async function POST(
       mes,
     } = body;
 
-    console.log("==========");
-    console.log("REQUEST");
-    console.log("==========");
-
-    console.log({
-      usuario,
-      empresa,
-      mes,
-    });
-
     const empresaSeleccionada =
       EMPRESAS.find(
-        (e) => e.rfc === empresa
+        (e) =>
+          e.rfc === empresa
       );
 
-    if (!empresaSeleccionada) {
+    if (
+      !empresaSeleccionada
+    ) {
       return NextResponse.json(
         {
           success: false,
           error:
             "Empresa no encontrada",
-          empresaRecibida:
-            empresa,
-          empresasDisponibles:
-            EMPRESAS,
         },
         {
           status: 404,
@@ -64,37 +53,20 @@ Terminada;
 Cancelada
 ) AS Estatus
 FROM DbOrdenProduccion AS O
-
 INNER JOIN DbAlmEntrada AS S
 ON S.empresa = O.empresa
 AND S.sucursal = O.sucursal
 AND S.folioOrden = O.folioOrden
-
 LEFT JOIN DbAlmEntradaDet AS SD
 ON SD.empresa = S.empresa
 AND SD.sucursal = S.sucursal
 AND SD.folioAlmEntrada = S.folioAlmEntrada
-
-WHERE O.empresa = @empresa
-AND O.sucursal = @sucursal
-AND O.mes = @mes
+WHERE O.empresa=@empresa
+AND O.sucursal=@sucursal
+AND O.mes=@mes
 `;
 
-    console.log("==========");
-    console.log("EMPRESA");
-    console.log("==========");
-
-    console.log(
-      empresaSeleccionada
-    );
-
-    console.log("==========");
-    console.log("CONSULTA SQL");
-    console.log("==========");
-
-    console.log(consulta);
-
-    const blob =
+    const raw =
       await consultarSiNube(
         usuario,
         empresaSeleccionada.rfc,
@@ -102,108 +74,73 @@ AND O.mes = @mes
         consulta
       );
 
-    console.log("==========");
-    console.log("RESPUESTA RAW");
-    console.log("==========");
-
-    console.log(
-      blob.substring(0, 3000)
-    );
-
     if (
-      blob.startsWith(
+      raw.startsWith(
         "<!DOCTYPE"
-      ) ||
-      blob.startsWith("<html")
+      )
     ) {
-      return NextResponse.json({
-        success: false,
-        error:
-          "SiNube devolvió HTML",
-        url:
-          process.env.SINUBE_URL,
-        raw:
-          blob.substring(0, 3000),
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "SiNube devolvió HTML",
+          raw:
+            raw.substring(
+              0,
+              3000
+            ),
+        },
+        {
+          status: 500,
+        }
+      );
     }
 
     if (
-      blob.startsWith("Error:")
+      raw.startsWith(
+        "Error:"
+      )
     ) {
-      return NextResponse.json({
-        success: false,
-        error: blob,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: raw,
+        },
+        {
+          status: 500,
+        }
+      );
     }
 
     const resultado =
-      parseBlob(blob);
-
-    console.log("==========");
-    console.log("PARSE");
-    console.log("==========");
-
-    console.log(
-      resultado
-    );
+      parseBlob(raw);
 
     const avance =
       calcularAvance(
         resultado.registros
       );
 
-    console.log("==========");
-    console.log("RESULTADO");
-    console.log("==========");
-
-    console.log(
-      avance.length
-    );
-
     return NextResponse.json({
       success: true,
-
-      debug: {
-        url:
-          process.env.SINUBE_URL,
-        usuario,
-        empresa:
-          empresaSeleccionada,
-        mes,
-      },
-
+      data: avance,
       registros:
         avance.length,
-
       raw:
-        blob.substring(0, 1000),
-
-      data: avance,
+        raw.substring(
+          0,
+          1000
+        ),
     });
-  } catch (error: any) {
-    console.error(error);
-
+  } catch (
+    error: any
+  ) {
     return NextResponse.json(
       {
         success: false,
         error:
-          error?.message ||
-          "Error desconocido",
-
+          error?.message,
         stack:
           error?.stack,
-
-        env: {
-          sinubeUrl:
-            process.env.SINUBE_URL
-              ? "OK"
-              : "NO CONFIGURADA",
-
-          sinubePassword:
-            process.env.SINUBE_PASSWORD
-              ? "OK"
-              : "NO CONFIGURADA",
-        },
       },
       {
         status: 500,
