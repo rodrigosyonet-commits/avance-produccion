@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import EmpresaSelector from "@/components/EmpresaSelector";
 import MesSelector from "@/components/MesSelector";
@@ -20,6 +20,7 @@ export default function Page() {
   const [error, setError] = useState("");
 
   const [data, setData] = useState<any[]>([]);
+
   const [debug, setDebug] = useState<any>(null);
 
   async function consultar() {
@@ -27,67 +28,115 @@ export default function Page() {
       setLoading(true);
       setError("");
 
-      const response = await fetch("/api/consulta", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          usuario,
-          empresaId: empresa,
-          mes,
-        }),
-      });
+      const payload = {
+        usuario,
+        empresaId: empresa,
+        mes,
+      };
 
-      const json = await response.json();
+      const response = await fetch(
+        "/api/consulta",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
-      setDebug(json);
+      const responseText =
+        await response.text();
 
-      if (!response.ok) {
+      let json: any = null;
+
+      try {
+        json = JSON.parse(responseText);
+      } catch {
+        setDebug({
+          enviando: payload,
+          status: response.status,
+          respuestaRaw: responseText,
+          tipo:
+            "La API devolvió HTML o texto plano",
+        });
+
         throw new Error(
-          json.error || "Error al consultar SiNube"
+          "La API no devolvió JSON válido"
         );
       }
 
-      setData(json.data || []);
+      setDebug({
+        enviando: payload,
+        status: response.status,
+        respuesta: json,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          json.error ??
+            "Error al consultar API"
+        );
+      }
+
+      setData(json.data ?? []);
     } catch (err: any) {
-      setError(err.message);
+      setError(
+        err.message ??
+          "Error desconocido"
+      );
     } finally {
       setLoading(false);
     }
   }
 
   const kpis = useMemo(() => {
-    const totalOrdenes = data.length;
+    const totalOrdenes =
+      data.length;
 
-    const totalPlaneado = data.reduce(
-      (sum, item) =>
-        sum + Number(item.cantidadProducir || 0),
-      0
-    );
+    const totalPlaneado =
+      data.reduce(
+        (sum, item) =>
+          sum +
+          Number(
+            item.cantidadProducir || 0
+          ),
+        0
+      );
 
-    const totalProducido = data.reduce(
-      (sum, item) =>
-        sum + Number(item.cantidadProducida || 0),
-      0
-    );
+    const totalProducido =
+      data.reduce(
+        (sum, item) =>
+          sum +
+          Number(
+            item.cantidadProducida || 0
+          ),
+        0
+      );
 
     const avancePromedio =
       totalOrdenes > 0
         ? data.reduce(
             (sum, item) =>
-              sum + Number(item.avance || 0),
+              sum +
+              Number(item.avance || 0),
             0
           ) / totalOrdenes
         : 0;
 
-    const terminadas = data.filter(
-      (item) => item.estado === "🟢 Completa"
-    ).length;
+    const terminadas =
+      data.filter(
+        (x) =>
+          x.estado ===
+          "🟢 Completa"
+      ).length;
 
-    const enProceso = data.filter(
-      (item) => item.estado === "🟡 Parcial"
-    ).length;
+    const enProceso =
+      data.filter(
+        (x) =>
+          x.estado ===
+          "🟡 Parcial"
+      ).length;
 
     return {
       totalOrdenes,
@@ -102,31 +151,26 @@ export default function Page() {
   return (
     <main className="min-h-screen bg-slate-100 p-6">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-slate-900">
-            Avance de Producción
-          </h1>
-
-          <p className="mt-2 text-slate-600">
-            Consulta de producción SiNube por
-            empresa
-          </p>
-        </div>
+        <h1 className="mb-6 text-4xl font-bold">
+          Avance de Producción
+        </h1>
 
         <div className="mb-6 rounded-xl bg-white p-6 shadow">
           <div className="grid gap-4 md:grid-cols-4">
             <div>
-              <label className="mb-2 block text-sm font-medium">
-                Usuario SiNube
+              <label className="mb-2 block">
+                Usuario
               </label>
 
               <input
                 type="email"
                 value={usuario}
                 onChange={(e) =>
-                  setUsuario(e.target.value)
+                  setUsuario(
+                    e.target.value
+                  )
                 }
-                className="w-full rounded-lg border p-3"
+                className="w-full rounded border p-3"
               />
             </div>
 
@@ -144,7 +188,7 @@ export default function Page() {
               <button
                 onClick={consultar}
                 disabled={loading}
-                className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="w-full rounded bg-blue-600 p-3 text-white"
               >
                 {loading
                   ? "Consultando..."
@@ -155,44 +199,48 @@ export default function Page() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
+          <div className="mb-6 rounded border border-red-300 bg-red-50 p-4 text-red-700">
             {error}
           </div>
         )}
 
-        <div className="mb-6">
-          <KpiCards
-            totalOrdenes={kpis.totalOrdenes}
-            totalPlaneado={kpis.totalPlaneado}
-            totalProducido={kpis.totalProducido}
-            avancePromedio={
-              kpis.avancePromedio
-            }
-            terminadas={kpis.terminadas}
-            enProceso={kpis.enProceso}
-          />
-        </div>
+        <KpiCards
+          totalOrdenes={
+            kpis.totalOrdenes
+          }
+          totalPlaneado={
+            kpis.totalPlaneado
+          }
+          totalProducido={
+            kpis.totalProducido
+          }
+          avancePromedio={
+            kpis.avancePromedio
+          }
+          terminadas={
+            kpis.terminadas
+          }
+          enProceso={
+            kpis.enProceso
+          }
+        />
 
         {data.length > 0 && (
           <>
-            <div className="mb-6">
+            <div className="mt-6">
               <ProduccionChart
                 data={data}
               />
             </div>
 
-            <div className="mb-6 rounded-xl bg-white p-4 shadow">
-              <h2 className="mb-4 text-xl font-semibold">
-                Detalle de Producción
-              </h2>
-
+            <div className="mt-6 rounded-xl bg-white p-4 shadow">
               <DataTable data={data} />
             </div>
           </>
         )}
 
-        <div className="rounded-xl bg-slate-900 p-4 text-white shadow">
-          <h2 className="mb-4 text-lg font-semibold">
+        <div className="mt-6 rounded-xl bg-slate-900 p-4 text-white shadow">
+          <h2 className="mb-4 text-lg font-bold">
             Debug Consulta
           </h2>
 
