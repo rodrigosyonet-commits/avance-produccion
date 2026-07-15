@@ -1,63 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import EmpresaSelector from "@/components/EmpresaSelector";
 import MesSelector from "@/components/MesSelector";
-import KpiCards from "@/components/KpiCards";
 import ProduccionChart from "@/components/ProduccionChart";
 import DataTable from "@/components/DataTable";
 
-interface ApiResponse {
-  success?: boolean;
-  data?: any[];
-  debug?: any;
-  error?: string;
-}
-
-export default function Page() {
+export default function Home() {
   const [usuario, setUsuario] = useState(
     "sistemas1.qsitservices@gmail.com"
   );
 
-  const [empresa, setEmpresa] = useState("jugos");
+  const [empresa, setEmpresa] =
+    useState("SCM180807MS9");
 
-  const [mes, setMes] = useState(
-    new Date().getFullYear().toString() +
-      String(new Date().getMonth() + 1).padStart(
-        2,
-        "0"
-      )
-  );
+  const [mes, setMes] =
+    useState("202607");
 
-  const [loading, setLoading] = useState(false);
+  const [data, setData] =
+    useState<any[]>([]);
 
-  const [error, setError] = useState("");
+  const [debug, setDebug] =
+    useState<any>(null);
 
-  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] =
+    useState(false);
 
-  const [debug, setDebug] = useState<any>(null);
-
-  const consultar = async () => {
-    const payload = {
-      usuario,
-      empresaId: empresa,
-      mes,
-    };
-
+  async function consultar() {
     setLoading(true);
-    setError("");
-    setData([]);
 
     try {
-      setDebug({
-        estado: "INICIO_CONSULTA",
-        fecha: new Date().toISOString(),
-        payload,
-      });
+      const payload = {
+        usuario,
+        empresa,
+        mes,
+      };
 
       const response = await fetch(
-        "/api/consulta",
+        "/api/consultas",
         {
           method: "POST",
           headers: {
@@ -70,296 +51,121 @@ export default function Page() {
         }
       );
 
-      const responseText =
+      const texto =
         await response.text();
 
-      let result: ApiResponse;
+      let resultado: any;
 
       try {
-        result =
-          JSON.parse(responseText);
+        resultado =
+          JSON.parse(texto);
       } catch {
-        setDebug({
-          estado:
-            "ERROR_JSON_INVALIDO",
-          payload,
-          responseStatus:
-            response.status,
-          responseOk:
-            response.ok,
-          responseText:
-            responseText.substring(
-              0,
-              5000
-            ),
-        });
-
-        throw new Error(
-          "La API devolvió HTML o texto plano en lugar de JSON."
-        );
+        resultado = {
+          raw: texto,
+        };
       }
 
       setDebug({
-        responseStatus:
+        enviando: payload,
+        status:
           response.status,
-        responseOk:
-          response.ok,
-        ...(result.debug ??
-          result),
+        recibido:
+          resultado,
       });
 
       if (!response.ok) {
         throw new Error(
-          result.error ||
-            result.debug?.error ||
-            "Error al consultar API"
+          resultado?.error ||
+            texto
         );
       }
 
       setData(
-        Array.isArray(
-          result.data
-        )
-          ? result.data
-          : []
+        resultado.data || []
       );
-    } catch (err) {
-      const mensaje =
-        err instanceof Error
-          ? err.message
-          : "Error desconocido";
+    } catch (error: any) {
+      setDebug({
+        error:
+          error?.message,
+      });
 
-      setError(mensaje);
-
-      setDebug((prev: any) => ({
-        ...(prev ?? {}),
-        errorFrontend:
-          mensaje,
-      }));
-
-      console.error(err);
+      setData([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const kpis = useMemo(() => {
-    const totalOrdenes =
-      data.length;
-
-    const totalPlaneado =
-      data.reduce(
-        (sum, row) =>
-          sum +
-          Number(
-            row.cantidadProducir ||
-              0
-          ),
-        0
-      );
-
-    const totalProducido =
-      data.reduce(
-        (sum, row) =>
-          sum +
-          Number(
-            row.cantidadProducida ||
-              0
-          ),
-        0
-      );
-
-    const avancePromedio =
-      totalOrdenes > 0
-        ? data.reduce(
-            (sum, row) =>
-              sum +
-              Number(
-                row.avance || 0
-              ),
-            0
-          ) / totalOrdenes
-        : 0;
-
-    const terminadas =
-      data.filter(
-        (row) =>
-          row.estado ===
-          "🟢 Completa"
-      ).length;
-
-    const enProceso =
-      data.filter(
-        (row) =>
-          row.estado ===
-          "🟡 Parcial"
-      ).length;
-
-    return {
-      totalOrdenes,
-      totalPlaneado,
-      totalProducido,
-      avancePromedio,
-      terminadas,
-      enProceso,
-    };
-  }, [data]);
+  }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold">
-            Avance de Producción
-          </h1>
+    <main className="p-8 space-y-6">
+      <h1 className="text-3xl font-bold">
+        Avance de Producción
+      </h1>
 
-          <p className="mt-2 text-slate-600">
-            Consulta manual
-            de producción
-            desde SiNube
-          </p>
-        </div>
+      <div className="border rounded-xl bg-white p-6">
+        <div className="grid md:grid-cols-3 gap-4">
 
-        <div className="mb-6 rounded-xl bg-white p-6 shadow">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Usuario
-              </label>
+          <div>
+            <label>
+              Usuario
+            </label>
 
-              <input
-                type="email"
-                value={usuario}
-                onChange={(e) =>
-                  setUsuario(
-                    e.target.value
-                  )
-                }
-                className="w-full rounded-lg border border-slate-300 p-3"
-              />
-            </div>
-
-            <EmpresaSelector
-              value={empresa}
-              onChange={
-                setEmpresa
+            <input
+              value={usuario}
+              onChange={(e) =>
+                setUsuario(
+                  e.target.value
+                )
               }
+              className="w-full border rounded p-2"
             />
-
-            <MesSelector
-              value={mes}
-              onChange={setMes}
-            />
-
-            <div className="flex items-end">
-              <button
-                onClick={
-                  consultar
-                }
-                disabled={
-                  loading
-                }
-                className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading
-                  ? "Consultando..."
-                  : "Consultar"}
-              </button>
-            </div>
           </div>
-        </div>
 
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4">
-            <div className="font-bold text-red-700">
-              Error
-            </div>
+          <EmpresaSelector
+            value={empresa}
+            onChange={setEmpresa}
+          />
 
-            <div className="mt-2 text-red-600">
-              {error}
-            </div>
-          </div>
-        )}
-
-        <div className="mb-6">
-          <KpiCards
-            totalOrdenes={
-              kpis.totalOrdenes
-            }
-            totalPlaneado={
-              kpis.totalPlaneado
-            }
-            totalProducido={
-              kpis.totalProducido
-            }
-            avancePromedio={
-              kpis.avancePromedio
-            }
-            terminadas={
-              kpis.terminadas
-            }
-            enProceso={
-              kpis.enProceso
-            }
+          <MesSelector
+            value={mes}
+            onChange={setMes}
           />
         </div>
 
-        {data.length > 0 && (
-          <>
-            <div className="mb-6 rounded-xl bg-white p-4 shadow">
-              <h2 className="mb-4 text-xl font-semibold">
-                Producción
-              </h2>
-
-              <ProduccionChart
-                data={data}
-              />
-            </div>
-
-            <div className="mb-6 rounded-xl bg-white p-4 shadow">
-              <h2 className="mb-4 text-xl font-semibold">
-                Detalle de
-                Producción
-              </h2>
-
-              <DataTable
-                data={data}
-              />
-            </div>
-          </>
-        )}
-
-        <div className="rounded-xl bg-slate-900 p-4 text-white shadow">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold">
-              Debug Completo
-            </h2>
-
-            <button
-              onClick={() =>
-                navigator.clipboard.writeText(
-                  JSON.stringify(
-                    debug,
-                    null,
-                    2
-                  )
-                )
-              }
-              className="rounded bg-slate-700 px-3 py-1 text-xs"
-            >
-              Copiar Debug
-            </button>
-          </div>
-
-          <pre className="max-h-[700px] overflow-auto whitespace-pre-wrap text-xs">
-            {JSON.stringify(
-              debug,
-              null,
-              2
-            )}
-          </pre>
-        </div>
+        <button
+          onClick={consultar}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          {loading
+            ? "Consultando..."
+            : "Consultar"}
+        </button>
       </div>
+
+      <div className="bg-black text-green-400 rounded-xl p-4">
+        <h2 className="font-bold mb-2">
+          Debug Consulta
+        </h2>
+
+        <pre className="text-xs overflow-auto">
+          {JSON.stringify(
+            debug,
+            null,
+            2
+          )}
+        </pre>
+      </div>
+
+      {data.length > 0 && (
+        <>
+          <ProduccionChart
+            data={data}
+          />
+
+          <DataTable
+            data={data}
+          />
+        </>
+      )}
     </main>
   );
 }
