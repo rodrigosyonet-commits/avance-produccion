@@ -47,13 +47,18 @@ export default function Home() {
         }
       );
 
-      const json = await response.json();
+ const json = await response.json();
 
-      setData(
-        Array.isArray(json)
-          ? json
-          : json.data || []
-      );
+console.log("STATUS:", response.status);
+console.log("RESPUESTA:", json);
+
+alert(JSON.stringify(json, null, 2));
+
+setData(
+  Array.isArray(json)
+    ? json
+    : json.data || []
+);
     } catch (error) {
       console.error(error);
 
