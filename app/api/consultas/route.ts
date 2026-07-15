@@ -64,43 +64,28 @@ export async function POST(request: Request) {
           : "NO CONFIGURADO",
     };
 
-    const consulta = `
-DECLARE @mes Long = ${mes};
+    const consulta =
+  "SELECT " +
+  "O.folioOrden," +
+  "O.cantidad AS [Cantidad a Producir]," +
+  "SD.cantidad AS [Cantidad Producida]," +
+  "RATING(O.estatus;;En Producción;Terminada;Cancelada) AS Estatus " +
+  "FROM DbOrdenProduccion AS O " +
+  "INNER JOIN DbAlmEntrada AS S " +
+  "ON S.empresa=O.empresa " +
+  "AND S.sucursal=O.sucursal " +
+  "AND S.folioOrden=O.folioOrden " +
+  "LEFT JOIN DbAlmEntradaDet AS SD " +
+  "ON SD.empresa=S.empresa " +
+  "AND SD.sucursal=S.sucursal " +
+  "AND SD.folioAlmEntrada=S.folioAlmEntrada " +
+  "WHERE O.empresa=@empresa " +
+  "AND O.sucursal=@sucursal " +
+  "AND O.mes=" + mes + " " +
+  "TAMPAG 1000";
 
-SELECT
-O.folioOrden,
-O.cantidad AS [Cantidad a Producir],
-SD.cantidad AS [Cantidad Producida],
-RATING(
-O.estatus;;
-En Producción;
-Terminada;
-Cancelada
-) AS Estatus
-
-FROM DbOrdenProduccion AS O
-
-INNER JOIN DbAlmEntrada AS S
-ON S.empresa = O.empresa
-AND S.sucursal = O.sucursal
-AND S.folioOrden = O.folioOrden
-
-LEFT JOIN DbAlmEntradaDet AS SD
-ON SD.empresa = S.empresa
-AND SD.sucursal = S.sucursal
-AND SD.folioAlmEntrada = S.folioAlmEntrada
-
-WHERE O.empresa = @empresa
-AND O.sucursal = @sucursal
-AND O.mes = @mes
-`;
-
-    debug.pasos.push(
-      "4. SQL generado"
-    );
-
-    debug.sql = consulta;
-
+debug.sqlGenerado = consulta;
+    
     debug.parametrosSiNube = {
       url:
         process.env.SINUBE_URL,
