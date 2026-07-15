@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import EmpresaSelector from "@/components/EmpresaSelector";
 import MesSelector from "@/components/MesSelector";
+import ProduccionChart from "@/components/ProduccionChart";
 import DataTable from "@/components/DataTable";
 
 export default function Home() {
@@ -11,25 +12,31 @@ export default function Home() {
     "sistemas1.qsitservices@gmail.com"
   );
 
-  const [empresa, setEmpresa] = useState(
-    "SCM180807MS9"
-  );
+  const [empresa, setEmpresa] =
+    useState("SCM180807MS9");
 
-  const [mes, setMes] = useState(() => {
-    const fecha = new Date();
-
-    return (
-      fecha.getFullYear().toString() +
-      String(fecha.getMonth() + 1).padStart(2, "0")
-    );
-  });
+  const [mes, setMes] = useState("202607");
 
   const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+
+  const [debug, setDebug] = useState<any>(null);
+
+  const [loading, setLoading] =
+    useState(false);
 
   async function consultar() {
+    setLoading(true);
+
     try {
-      setLoading(true);
+      const payload = {
+        usuario,
+        empresa,
+        mes,
+      };
+
+      setDebug({
+        enviando: payload,
+      });
 
       const response = await fetch(
         "/api/consulta",
@@ -39,34 +46,57 @@ export default function Home() {
             "Content-Type":
               "application/json",
           },
-          body: JSON.stringify({
-            usuario,
-            empresa,
-            mes,
-          }),
+          body: JSON.stringify(
+            payload
+          ),
         }
       );
 
- const json = await response.json();
+      const resultado =
+        await response.json();
 
-console.log("STATUS:", response.status);
-console.log("RESPUESTA:", json);
+      setDebug({
+        enviando: payload,
+        status: response.status,
+        recibido: resultado,
+      });
 
-alert(JSON.stringify(json, null, 2));
+      if (!response.ok) {
+        throw new Error(
+          resultado.error ||
+            "Error en API"
+        );
+      }
 
-setData(
-  Array.isArray(json)
-    ? json
-    : json.data || []
-);
-    } catch (error) {
+      if (
+        Array.isArray(resultado)
+      ) {
+        setData(resultado);
+      } else if (
+        Array.isArray(
+          resultado.data
+        )
+      ) {
+        setData(
+          resultado.data
+        );
+      } else {
+        setData([]);
+      }
+    } catch (error: any) {
       console.error(error);
 
-      alert(
-        "Error al consultar SiNube"
-      );
+      setDebug((prev: any) => ({
+        ...prev,
+        error:
+          error?.message ||
+          String(error),
+      }));
 
-      setData([]);
+      alert(
+        error?.message ||
+          "Error al consultar SiNube"
+      );
     } finally {
       setLoading(false);
     }
@@ -79,16 +109,16 @@ setData(
           Avance de Producción
         </h1>
 
-        <p className="text-slate-500 mt-1">
-          Consulta manual de producción
-          por empresa.
+        <p className="text-slate-500">
+          Consulta Productiva
+          SiNube
         </p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-3">
+      <div className="border rounded-xl p-6 bg-white shadow">
+        <div className="grid md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block mb-1 text-sm font-medium">
               Usuario
             </label>
 
@@ -100,7 +130,7 @@ setData(
                   e.target.value
                 )
               }
-              className="w-full rounded-lg border p-2"
+              className="w-full border rounded-lg p-2"
             />
           </div>
 
@@ -115,34 +145,61 @@ setData(
           />
         </div>
 
-        <div className="mt-4">
-          <button
-            onClick={consultar}
-            disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:bg-slate-400"
-          >
-            {loading
-              ? "Consultando..."
-              : "Consultar"}
-          </button>
-        </div>
+        <button
+          onClick={consultar}
+          disabled={loading}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg"
+        >
+          {loading
+            ? "Consultando..."
+            : "Consultar"}
+        </button>
       </div>
 
+      {/* DEBUG */}
+
+      <div className="border rounded-xl bg-black text-green-400 p-4">
+        <h2 className="font-bold mb-2">
+          Debug Consulta
+        </h2>
+
+        <pre className="text-xs overflow-auto">
+          {JSON.stringify(
+            debug,
+            null,
+            2
+          )}
+        </pre>
+      </div>
+
+      {/* GRAFICA */}
+
       {data.length > 0 && (
-        <div className="bg-white border rounded-xl p-4 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4">
-            Resultados
+        <ProduccionChart
+          data={data}
+        />
+      )}
+
+      {/* TABLA */}
+
+      {data.length > 0 && (
+        <div className="border rounded-xl bg-white p-4">
+          <h2 className="font-semibold mb-4">
+            Datos
           </h2>
 
-          <DataTable data={data} />
+          <DataTable
+            data={data}
+          />
         </div>
       )}
 
+      {/* VACIO */}
+
       {!loading &&
         data.length === 0 && (
-          <div className="border border-dashed rounded-xl p-10 text-center text-slate-500">
-            Selecciona una empresa y
-            presiona Consultar.
+          <div className="border border-dashed rounded-xl p-8 text-center text-slate-500">
+            Sin resultados
           </div>
         )}
     </main>
