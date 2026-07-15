@@ -5,39 +5,46 @@ import { consultarSiNube } from "@/lib/sinube";
 import { parseBlob } from "@/lib/blobParser";
 import { calcularAvance } from "@/lib/avanceService";
 
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
+  const debug: any = {
+    fecha: new Date().toISOString(),
+    paso: [],
+  };
+
   try {
-    const body =
-      await request.json();
+    debug.paso.push("1. Inicio API");
+
+    const body = await request.json();
+
+    debug.bodyRecibido = body;
 
     const {
       usuario,
-      empresa,
+      empresaId,
       mes,
     } = body;
 
-    const empresaSeleccionada =
-      EMPRESAS.find(
-        (e) =>
-          e.rfc === empresa
-      );
+    debug.paso.push("2. Body recibido");
 
-    if (
-      !empresaSeleccionada
-    ) {
+    const empresa = EMPRESAS.find(
+      (e) => e.id === empresaId
+    );
+
+    if (!empresa) {
+      debug.error =
+        "Empresa no encontrada";
+
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Empresa no encontrada",
-        },
-        {
-          status: 404,
-        }
+        debug,
+        { status: 400 }
       );
     }
+
+    debug.paso.push(
+      "3. Empresa localizada"
+    );
+
+    debug.empresaSeleccionada = empresa;
 
     const consulta = `
 DECLARE @mes Long = ${mes};
@@ -52,95 +59,247 @@ En Producción;
 Terminada;
 Cancelada
 ) AS Estatus
+
 FROM DbOrdenProduccion AS O
+
 INNER JOIN DbAlmEntrada AS S
 ON S.empresa = O.empresa
 AND S.sucursal = O.sucursal
 AND S.folioOrden = O.folioOrden
+
 LEFT JOIN DbAlmEntradaDet AS SD
 ON SD.empresa = S.empresa
 AND SD.sucursal = S.sucursal
 AND SD.folioAlmEntrada = S.folioAlmEntrada
-WHERE O.empresa=@empresa
-AND O.sucursal=@sucursal
-AND O.mes=@mes
+
+WHERE O.empresa = @empresa
+AND O.sucursal = @sucursal
+AND O.mes = @mes
 `;
 
-    const raw =
-      await consultarSiNube(
+    debug.paso.push(
+      "4. SQL generado"
+    );
+
+    debug.sql = consulta;
+
+    debug.parametrosSiNube = {
+      url: process.env.SINUBE_URL,
+      tipo: "3",
+      emp: empresa.rfc,
+      suc: empresa.sucursal,
+      usu: usuario,
+      pas:
+        process.env.SINUBE_PASSWORD
+          ? "******"
+          : "NO DEFINIDO",
+    };
+
+    debug.paso.push(
+      "5. Antes de llamar SiNube"
+    );
+
+    let blob = "";
+
+    try {
+      blob = await consultarSiNube(
         usuario,
-        empresaSeleccionada.rfc,
-        empresaSeleccionada.sucursal,
+        empresa.rfc,
+        empresa.sucursal,
         consulta
       );
+    } catch (sinubeError: any) {
+      debug.errorSiNube =
+        sinubeError?.message ??
+        "Error desconocido";
 
-    if (
-      raw.startsWith(
-        "<!DOCTYPE"
-      )
-    ) {
+      debug.paso.push(
+        "ERROR AL LLAMAR SINUBE"
+      );
+
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "SiNube devolvió HTML",
-          raw:
-            raw.substring(
-              0,
-              3000
-            ),
-        },
-        {
-          status: 500,
-        }
+        debug,
+        { status: 500 }
+      );
+    }
+
+    debug.paso.push(
+      "6. Respuesta recibida de SiNube"
+    );
+
+    debug.longitudBlob =
+      blob?.length ?? 0;
+
+    debug.primeros1000Caracteres =
+      blob?.substring(0, 1000);
+
+    if (!blob) {
+      debug.error =
+        "SiNube devolvió respuesta vacía";
+
+      return NextResponse.json(
+        debug,
+        { status: 500 }
       );
     }
 
     if (
-      raw.startsWith(
-        "Error:"
-      )
+      blob.startsWith("Error:")
     ) {
+      debug.errorSiNube = blob;
+
+      debug.paso.push(
+        "ERROR DEVUELTO POR SINUBE"
+      );
+
       return NextResponse.json(
-        {
-          success: false,
-          error: raw,
-        },
-        {
-          status: 500,
-        }
+        debug,
+        { status: 500 }
       );
     }
 
-    const resultado =
-      parseBlob(raw);
+    if (
+      blob.startsWith("<!DOCTYPE") ||
+      blob.startsWith("<html")
+    ) {
+      debug.errorHtml =
+        "SiNube devolvió HTML";
 
-    const avance =
-      calcularAvance(
-        resultado.registros
+      return NextResponse.json(
+        debug,
+        { status: 500 }
       );
+    }
+
+    debug.paso.push(
+      "7. Parseando Blob"
+    );
+
+    let parsed;
+
+    try {
+      parsed = parseBlob(blob);
+
+      debug.columnas =
+        parsed.columnas;
+
+      debug.totalColumnas =
+        parsed.columnas.length;
+
+      debug.totalRegistros =
+        parsed.registros.length;
+
+      debug.primerRegistro =
+        parsed.registros[0] ?? null;
+    } catch (parseError: any) {
+      debug.errorParsing =
+        parseError.message;
+
+      return NextResponse.json(
+        debug,
+        { status: 500 }
+      );
+    }
+
+    debug.paso.push(
+      "8. Calculando Avance"
+    );
+
+    let data = [];
+
+    try {
+      data = calcularAvance(
+        parsed.registros
+      );
+
+      debug.registrosProcesados =
+        data.length;
+
+      debug.primerResultado =
+        data[0] ?? null;
+    } catch (avanceError: any) {
+      debug.errorAvance =
+        avanceError.message;
+
+      return NextResponse.json(
+        debug,
+        { status: 500 }
+      );
+    }
+
+    debug.paso.push(
+      "9. KPIs"
+    );
+
+    const totalOrdenes =
+      data.length;
+
+    const totalPlaneado =
+      data.reduce(
+        (sum: number, item: any) =>
+          sum +
+          Number(
+            item.cantidadProducir || 0
+          ),
+        0
+      );
+
+    const totalProducido =
+      data.reduce(
+        (sum: number, item: any) =>
+          sum +
+          Number(
+            item.cantidadProducida || 0
+          ),
+        0
+      );
+
+    const avancePromedio =
+      data.length > 0
+        ? data.reduce(
+            (
+              sum: number,
+              item: any
+            ) =>
+              sum +
+              Number(
+                item.avance || 0
+              ),
+            0
+          ) / data.length
+        : 0;
+
+    debug.kpis = {
+      totalOrdenes,
+      totalPlaneado,
+      totalProducido,
+      avancePromedio,
+    };
+
+    debug.paso.push(
+      "10. Fin correcto"
+    );
 
     return NextResponse.json({
       success: true,
-      data: avance,
-      registros:
-        avance.length,
-      raw:
-        raw.substring(
-          0,
-          1000
-        ),
+      data,
+      debug,
     });
-  } catch (
-    error: any
-  ) {
+  } catch (error: any) {
+    debug.error =
+      error?.message ??
+      "Error desconocido";
+
+    debug.stack = error?.stack;
+
+    debug.paso.push(
+      "ERROR GENERAL"
+    );
+
     return NextResponse.json(
       {
         success: false,
-        error:
-          error?.message,
-        stack:
-          error?.stack,
+        debug,
       },
       {
         status: 500,
