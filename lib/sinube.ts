@@ -4,21 +4,21 @@ export async function consultarSiNube(
   sucursal: string,
   consulta: string
 ) {
-  const url =
-    process.env.SINUBE_URL;
-
   const password =
     process.env.SINUBE_PASSWORD;
 
-  if (!url) {
-    throw new Error(
-      "SINUBE_URL no configurada"
-    );
-  }
+  const url =
+    process.env.SINUBE_URL;
 
   if (!password) {
     throw new Error(
-      "SINUBE_PASSWORD no configurada"
+      "SINUBE_PASSWORD no configurado"
+    );
+  }
+
+  if (!url) {
+    throw new Error(
+      "SINUBE_URL no configurado"
     );
   }
 
@@ -35,16 +35,12 @@ export async function consultarSiNube(
   const response =
     await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded",
-      },
       body: form,
       cache: "no-store",
     });
 
-  const texto =
+  const text =
     await response.text();
 
-  return texto;
+  return text;
 }
